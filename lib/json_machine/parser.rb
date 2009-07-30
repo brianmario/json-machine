@@ -7,14 +7,13 @@ module JsonMachine
     NULL = "null".freeze
     TRUE = "true".freeze
     FALSE = "false".freeze
-    NUMBER_MATCHER = /[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/.freeze
-    STRING_MATCHER = /\"(.*)\"/.freeze
+    NUMBER_MATCHER = /[-+]?\d*\.?\d+([eE][-+]?\d+)?/.freeze
     
     def initialize(opts={})
       # TODO: setup options
       @builder_stack = []
       @options = opts
-      @state = :beginning
+      @state = :wants_anything
     end
     
     def found_string(str)
@@ -75,57 +74,100 @@ module JsonMachine
       set_value(nil)
     end
     
-    def parse(str)
-      scanner = StringScanner.new(str)
-      char = scanner.peek(1)
-      case char
-      when '"'
-        if scanner.check(STRING_MATCHER)
-          string = scanner.scan_until(STRING_MATCHER)
-          found_string(string[1,string.size-2])
-        end
-      when /[0-9]/
-        if scanner.check(NUMBER_MATCHER)
-          found_number(scanner.scan_until(/.*[,]?/))
-        end
-      when 'n'
-        if scanner.peek(4) === NULL
-          found_nil
-          scanner.pos = scanner.pos+4
-        end
-      when 't'
-        if scanner.peek(4) === TRUE
-          found_boolean(true)
-          scanner.pos = scanner.pos+4
-        end
-      when 'f'
-        if scanner.peek(5) === FALSE
-          found_boolean(false)
-          scanner.pos = scanner.pos+5
-        end
-      when '{'
-        
-      when '['
-        
+    def parse(str_or_io, &block)
+      if str_or_io.is_a?(String)
+        internal_parse(str_or_io)
+      elsif str_or_io.respond_to?(:read)
+        # TODO: not supported yet
+        # while str = str_or_io.read(READ_BUFFER_SIZE)
+        #   internal_parse(str)
+        # end
       end
-      @builder_stack.pop
     end
     
     protected
+      def internal_parse(str)
+        scanner = StringScanner.new(str)
+        while !scanner.eos? && (char = scanner.peek(1))
+          case char
+          when '"'
+            if @state == :wants_hash_key
+              if scanner.check_until(/\".*\":/)
+                string = scanner.scan_until(/\".*\":/)
+                found_hash_key(string[1,string.size-3])
+                @state = :wants_hash_key_value
+              end
+            elsif @state == :wants_array_value
+              if scanner.check_until(/.*,|.*[^,\s]/)
+                string = scanner.scan_until(/.*,|.*[^,\s]/)
+                found_hash_key(string[1,string.size-3])
+                @state = :wants_anything
+              end
+            else
+              if scanner.check_until(/\".*\"/)
+                string = scanner.scan_until(/\".*\"/)
+                found_string(string[1,string.size-2])
+              end
+            end
+          when /[0-9]/
+            if scanner.check_until(NUMBER_MATCHER)
+              found_number(scanner.scan_until(NUMBER_MATCHER))
+            end
+          when 'n'
+            if scanner.peek(4) === NULL
+              found_nil
+              scanner.pos = scanner.pos+4
+            end
+          when 't'
+            if scanner.peek(4) === TRUE
+              found_boolean(true)
+              scanner.pos = scanner.pos+4
+            end
+          when 'f'
+            if scanner.peek(5) === FALSE
+              found_boolean(false)
+              scanner.pos = scanner.pos+5
+            end
+          when '{'
+            found_hash_start
+            scanner.pos = scanner.pos+1
+            @state = :wants_hash_key
+            next
+          when '}'
+            found_hash_end
+            scanner.pos = scanner.pos+1
+            next
+          when '['
+            found_array_start
+            scanner.pos = scanner.pos+1
+            @state = :wants_array_value
+            next
+          when ']'
+            found_array_end
+            scanner.pos = scanner.pos+1
+            next
+          when ' '
+            scanner.skip(/\s+/)
+            next
+          end
+        end
+        @builder_stack.pop
+      end
+    
       def set_value(value)
         len = @builder_stack.size
         if len > 0
           last_entry = @builder_stack.last
-          case last_entry.class
-          when Array
+          case last_entry.class.name
+          when 'Array'
             last_entry << value
             if value.is_a?(Hash) or value.is_a?(Array)
               @builder_stack << value
             end
-          when Hash
+          when 'Hash'
             last_entry[value] = nil
             @builder_stack << value
-          when String, Symbol
+          when 'String', 'Symbol'
             hash = @builder_stack[len-2]
             if hash.is_a?(Hash)
               hash[last_entry] = value
