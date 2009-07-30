@@ -91,22 +91,20 @@ module JsonMachine
         while !scanner.eos? && (char = scanner.peek(1))
           case char
           when '"'
-            if @state == :wants_hash_key
-              if scanner.check_until(/\".*\":/)
-                string = scanner.scan_until(/\".*\":/)
-                found_hash_key(string[1,string.size-3])
-                @state = :wants_hash_key_value
-              end
-            elsif @state == :wants_array_value
-              if scanner.check_until(/.*,|.*[^,\s]/)
-                string = scanner.scan_until(/.*,|.*[^,\s]/)
-                found_hash_key(string[1,string.size-3])
-                @state = :wants_anything
-              end
-            else
-              if scanner.check_until(/\".*\"/)
-                string = scanner.scan_until(/\".*\"/)
-                found_string(string[1,string.size-2])
+            scanner.pos += 1
+            current_string = ""
+            while check = scanner.check_until(/(\\"|[":,\\])/)
+              if check[check.size-2,2] == "\\\"" # end of an escaped string
+                current_string << check
+                scanner.pos += check.size
+              elsif check[check.size-1,1] == "\"" # end of a string
+                current_string << check
+                scanner.pos += check.size
+                found_string(current_string[0, current_string.size-1])
+                break
+              else
+                current_string << check
+                scanner.pos += check.size
               end
             end
           when /[0-9]/
@@ -146,8 +144,8 @@ module JsonMachine
             found_array_end
             scanner.pos = scanner.pos+1
             next
-          when ' '
-            scanner.skip(/\s+/)
+          else
+            scanner.pos = scanner.pos+1
             next
           end
         end
