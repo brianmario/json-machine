@@ -12,6 +12,18 @@ module JsonMachine
     TRUE = "true".freeze
     FALSE = "false".freeze
     NUMBER_MATCHER = /[-+]?\d*\.?\d+([eE][-+]?\d+)?/.freeze
+    UNESCAPE_MAP = Hash.new { |h, k| h[k] = k.chr }
+    UNESCAPE_MAP.update({
+      ?"  => '"',
+      ?\\ => '\\',
+      ?/  => '/',
+      ?b  => "\b",
+      ?f  => "\f",
+      ?n  => "\n",
+      ?r  => "\r",
+      ?t  => "\t",
+      ?u  => nil, 
+    })
     
     def initialize(opts={})
       # TODO: setup options
@@ -105,6 +117,11 @@ module JsonMachine
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(/\"|\\\".+\"/m)
+            current = current.gsub(/\\[\\bfnrt]/) do |match|
+              if u = UNESCAPE_MAP[$&[1]]
+                u
+              end
+            end
             current = current[0,current.size-1]
             if @state == :wants_hash_key
               current = current.to_sym if @options[:symbolize_keys]
