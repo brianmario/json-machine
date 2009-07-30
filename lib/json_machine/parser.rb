@@ -1,107 +1,142 @@
 # encoding: UTF-8
 
 module JsonMachine
+  class ParseError < StandardError; end
+  
   class Parser
     NULL = "null".freeze
     TRUE = "true".freeze
     FALSE = "false".freeze
+    NUMBER_MATCHER = /[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?/.freeze
+    STRING_MATCHER = /\"(.*)\"/.freeze
     
     def initialize(opts={})
       # TODO: setup options
+      @builder_stack = []
+      @options = opts
+      @state = :beginning
     end
     
-    def parse(str_or_io)
-      str_or_io = StringIO.new(str_or_io) if str_or_io.is_a?(String)
-      current_value = ""
-      while char = str_or_io.read(1)
-        case char
-        when '"'
-          if parse_string(str_or_io, current_value)
-            return current_value
-          else
-            # TODO: throw exception?
-          end
-        when /[0-9]/ # probably a number
-          current_value = char
-          if parse_number(str_or_io, current_value)
-            return current_value
-          else
-            # TODO: raise exception?
-          end
-        when 'n' # probably null
-          current_value = char
-          if parse_null(str_or_io, current_value)
-            return nil
-          else
-            # TODO: raise exception?
-          end
-        when 't' # probably true
-          current_value = char
-          if parse_true(str_or_io, current_value)
-            return true
-          else
-            # TODO: raise exception?
-          end
-        when 'f' # probably false
-          current_value = char
-          if parse_false(str_or_io, current_value)
-            return false
-          else
-            # TODO: raise exception?
-          end
-        when '{' # probably the start of a hash
-        when '[' # probably the start of an array
+    def found_string(str)
+      set_value(str)
+    end
+    
+    def found_number(number_str)
+      if number_str.include?('E') || number_str.include?('e')
+        if number_str.include?('.')
+          # TODO: need to parse numbers with an E
+          raise ParseError, "Need to implement converting a float string with exponents"
         else
-          if char == "'"
-            # TODO: throw exception?
-            # This is the case where we're parsing a string that should be wrapped with double-quotes
-            # Either a hash key or string value
-          end
-          # TODO: something here?
+          # TODO: need to parse numbers with an E
+          raise ParseError, "Need to implement converting an integer string with exponents"
+        end
+      else
+        if number_str.include?('.')
+          set_value(number_str.to_f)
+        else
+          set_value(number_str.to_i)
         end
       end
+    end
+    
+    def found_hash_start
+      set_value({})
+    end
+    
+    def found_hash_key(key)
+      if @options[:symbolize_keys]
+        set_value(key.to_sym)
+      else
+        set_value(key)
+      end
+    end
+    
+    def found_hash_end
+      if @builder_stack.size > 1
+        @builder_stack.pop
+      end
+    end
+    
+    def found_array_start
+      set_value([])
+    end
+    
+    def found_array_end
+      if @builder_stack.size > 1
+        @builder_stack.pop
+      end
+    end
+    
+    def found_boolean(bool)
+      set_value(bool)
+    end
+    
+    def found_nil
+      set_value(nil)
+    end
+    
+    def parse(str)
+      scanner = StringScanner.new(str)
+      char = scanner.peek(1)
+      case char
+      when '"'
+        if scanner.check(STRING_MATCHER)
+          string = scanner.scan_until(STRING_MATCHER)
+          found_string(string[1,string.size-2])
+        end
+      when /[0-9]/
+        if scanner.check(NUMBER_MATCHER)
+          found_number(scanner.scan_until(/.*[,]?/))
+        end
+      when 'n'
+        if scanner.peek(4) === NULL
+          found_nil
+          scanner.pos = scanner.pos+4
+        end
+      when 't'
+        if scanner.peek(4) === TRUE
+          found_boolean(true)
+          scanner.pos = scanner.pos+4
+        end
+      when 'f'
+        if scanner.peek(5) === FALSE
+          found_boolean(false)
+          scanner.pos = scanner.pos+5
+        end
+      when '{'
+        
+      when '['
+        
+      end
+      @builder_stack.pop
     end
     
     protected
-      def parse_string(io, out_str)
-        while char = io.read(1)
-          return true if char == '"'
-          out_str << char
-        end
-        return false
-      end
-      
-      def parse_number(io, out_str)
-        while char = io.read(1)
-          return if char == ','
-          out_str << char
-        end
-      end
-      
-      def parse_true(io, out_str)
-        out_str << io.read(3)
-        if out_str != TRUE
-          return false
+      def set_value(value)
+        len = @builder_stack.size
+        if len > 0
+          last_entry = @builder_stack.last
+          case last_entry.class
+          when Array
+            last_entry << value
+            if value.is_a?(Hash) or value.is_a?(Array)
+              @builder_stack << value
+            end
+          when Hash
+            last_entry[value] = nil
+            @builder_stack << value
+          when String, Symbol
+            hash = @builder_stack[len-2]
+            if hash.is_a?(Hash)
+              hash[last_entry] = value
+              @builder_stack.pop
+              if value.is_a?(Hash) or value.is_a?(Array)
+                @builder_stack << value
+              end
+            end
+          end
         else
-          return true
-        end
-      end
-      
-      def parse_false(io, out_str)
-        out_str << io.read(4)
-        if out_str != FALSE
-          return false
-        else
-          return true
-        end
-      end
-      
-      def parse_null(io, out_str)
-        out_str << io.read(3)
-        if out_str != NULL
-          return false
-        else
-          return true
+          @builder_stack << value
         end
       end
   end
