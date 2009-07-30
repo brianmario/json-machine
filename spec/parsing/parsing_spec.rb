@@ -1,5 +1,5 @@
 # encoding: UTF-8
-require File.join(File.dirname(__FILE__), 'spec_helper.rb')
+require File.join(File.dirname(__FILE__), '..', 'spec_helper.rb')
 
 describe "JsonMachine::Parser" do
   before(:each) do
@@ -26,7 +26,6 @@ describe "JsonMachine::Parser" do
   end
   
   it "should parse a number with an exponent" do
-    pending
     @parser.parse('23456789012E66').should == 23456789012E66
     @parser.parse('1.234567890E+34').should == 1.234567890E+34
     @parser.parse('0.123456789e-12').should == 0.123456789e-12

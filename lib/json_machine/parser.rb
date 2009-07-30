@@ -4,6 +4,10 @@ module JsonMachine
   class ParseError < StandardError; end
   
   class Parser
+    def self.parse(str_or_io, opts={}, &block)
+      new(opts).parse(str_or_io, &block)
+    end
+    
     NULL = "null".freeze
     TRUE = "true".freeze
     FALSE = "false".freeze
@@ -14,6 +18,10 @@ module JsonMachine
       @builder_stack = []
       @options = opts
       @state = :wants_anything
+      @callback = nil
+      @nested_array_level = 0
+      @nested_hash_level = 0
+      @objects_found = 0
     end
     
     def found_string(str)
@@ -21,24 +29,15 @@ module JsonMachine
     end
     
     def found_number(number_str)
-      if number_str.include?('E') || number_str.include?('e')
-        if number_str.include?('.')
-          # TODO: need to parse numbers with an E
-          raise ParseError, "Need to implement converting a float string with exponents"
-        else
-          # TODO: need to parse numbers with an E
-          raise ParseError, "Need to implement converting an integer string with exponents"
-        end
+      if number_str.include?('.') || number_str.include?('E') || number_str.include?('e')
+        set_value(Float(number_str))
       else
-        if number_str.include?('.')
-          set_value(number_str.to_f)
-        else
-          set_value(number_str.to_i)
-        end
+        set_value(Integer(number_str))
       end
     end
     
     def found_hash_start
+      @nested_hash_level += 1
       set_value({})
     end
     
@@ -51,16 +50,19 @@ module JsonMachine
     end
     
     def found_hash_end
+      @nested_hash_level -= 1
       if @builder_stack.size > 1
         @builder_stack.pop
       end
     end
     
     def found_array_start
+      @nested_array_level += 1
       set_value([])
     end
     
     def found_array_end
+      @nested_array_level -= 1
       if @builder_stack.size > 1
         @builder_stack.pop
       end
@@ -74,7 +76,12 @@ module JsonMachine
       set_value(nil)
     end
     
+    def on_parse_complete=(callback)
+      @callback = callback
+    end
+    
     def parse(str_or_io, &block)
+      @callback = block if block_given?
       if str_or_io.is_a?(String)
         internal_parse(str_or_io)
       elsif str_or_io.respond_to?(:read)
@@ -84,29 +91,24 @@ module JsonMachine
         # end
       end
     end
-    
+    alias :<< :parse
     protected
       def internal_parse(str)
         scanner = StringScanner.new(str)
         while !scanner.eos? && (char = scanner.peek(1))
           case char
           when '"'
-            scanner.pos += 1
-            current_string = ""
-            while check = scanner.check_until(/(\\"|[":,\\])/)
-              if check[check.size-2,2] == "\\\"" # end of an escaped string
-                current_string << check
-                scanner.pos += check.size
-              elsif check[check.size-1,1] == "\"" # end of a string
-                current_string << check
-                scanner.pos += check.size
-                found_string(current_string[0, current_string.size-1])
-                break
-              else
-                current_string << check
-                scanner.pos += check.size
-              end
+            # grabs the contents of a string between " and ", even escaped strings
+            scanner.pos += 1 # don't need the wrapping " char
+            current = scanner.scan_until(/\"|\\\".+\"/)
+            current = current[0,current.size-1]
+            if @state == :wants_hash_key
+              current = current.to_sym if @options[:symbolize_keys]
+              found_hash_key(current)
+            else
+              found_string(current)
             end
+            scanner.pos += 1 unless scanner.eos? # skip the trailing " char
           when /[0-9]/
             if scanner.check_until(NUMBER_MATCHER)
               found_number(scanner.scan_until(NUMBER_MATCHER))
@@ -145,11 +147,20 @@ module JsonMachine
             scanner.pos = scanner.pos+1
             next
           else
-            scanner.pos = scanner.pos+1
+            if @state == :wants_hash_key && char == ':'
+              raise ParseError, "Expected the start of a Hash key but got #{char} instead"
+            end
+            # try to skip multiple chars instead of just one char at a time
+            # but fall back to skipping one at a time
+            scanner.skip(/[ \*\t\r\n,]+/) || scanner.pos += 1
             next
           end
         end
-        @builder_stack.pop
+        unless @callback.nil?
+          check_and_fire_callback
+        else
+          @builder_stack.pop
+        end
       end
     
       def set_value(value)
@@ -177,6 +188,21 @@ module JsonMachine
           end
         else
           @builder_stack << value
+        end
+      end
+      
+      def check_and_fire_callback
+        if !@callback.nil?
+          if @builder_stack.size == 1 && @nested_array_level == 0 && @nested_hash_level == 0
+            @callback.call(@builder_stack.pop)
+          end
+        else
+          if @builder_stack.size == 1 && @nested_array_level == 0 && @nested_hash_level == 0
+            @objects_found += 1
+            if @objects_found > 1
+              raise ParseError, "Found multiple JSON objects in the stream but no block or the on_parse_complete callback was assigned to handle them."
+            end
+          end
         end
       end
   end
