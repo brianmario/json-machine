@@ -3,8 +3,8 @@
 require 'rubygems'
 require 'benchmark'
 require 'yajl'
-# require 'json/pure'
-require 'activesupport'
+require 'json/pure'
+# require 'activesupport'
 require File.join(File.dirname(__FILE__), '..', 'lib', 'json_machine')
 
 json = File.read(ARGV[0])
@@ -21,13 +21,13 @@ Benchmark.bm do |x|
     json_machine = parser.parse(json)
   end
   
-  # puts "JSON (pure)"
-  # x.report do
-  #   json_pure = JSON.parse(json)
-  # end
-  
-  puts "ActiveSupport"
+  puts "JSON (pure)"
   x.report do
-    active_support = ActiveSupport::JSON.decode(json)
+    json_pure = JSON.parse(json)
   end
+  
+  # puts "ActiveSupport"
+  # x.report do
+  #   active_support = ActiveSupport::JSON.decode(json)
+  # end
 end

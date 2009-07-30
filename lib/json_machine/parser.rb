@@ -57,6 +57,9 @@ module JsonMachine
     end
     
     def found_array_start
+      if @state != :wants_array_value || !@builder_stack.last.is_a?(Array)
+        @builder_stack.pop
+      end
       @nested_array_level += 1
       set_value([])
     end
@@ -66,6 +69,7 @@ module JsonMachine
       if @builder_stack.size > 1
         @builder_stack.pop
       end
+      @state = :wants_anything
     end
     
     def found_boolean(bool)
@@ -100,10 +104,11 @@ module JsonMachine
           when '"'
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
-            current = scanner.scan_until(/\"|\\\".+\"/)
+            current = scanner.scan_until(/\"|\\\".+\"/m)
             current = current[0,current.size-1]
             if @state == :wants_hash_key
               current = current.to_sym if @options[:symbolize_keys]
+              @state == :wants_anything
               found_hash_key(current)
             else
               found_string(current)

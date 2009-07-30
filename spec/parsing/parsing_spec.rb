@@ -40,7 +40,6 @@ describe "JsonMachine::Parser" do
   end
   
   it "should parse a array with every type as a value" do
-    pending
     @parser.parse('["value", false, true, null, 123456, 123456.789, {"key": "value"}, ["nested", "array"]]').should === ["value", false, true, nil, 123456, 123456.789, {"key" => "value"}, ["nested", "array"]]
   end
   
