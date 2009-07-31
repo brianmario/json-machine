@@ -17,8 +17,8 @@ Benchmark.bm do |x|
   
   puts "JsonMachine"
   x.report do
-    parser = JsonMachine::Parser.new
-    json_machine = parser.parse(json)
+    parser = JsonMachine::Parser.new(:symbolize_keys => true)
+    puts (json_machine = parser.parse(json)).inspect
   end
   
   puts "JSON (pure)"

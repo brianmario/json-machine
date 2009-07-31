@@ -55,7 +55,8 @@ module JsonMachine
     
     def found_hash_key(key)
       if @options[:symbolize_keys]
-        set_value(key.to_sym)
+        key = key.to_sym unless key == ''
+        set_value(key) 
       else
         set_value(key)
       end
@@ -124,7 +125,6 @@ module JsonMachine
             end
             current = current[0,current.size-1]
             if @state == :wants_hash_key
-              current = current.to_sym if @options[:symbolize_keys]
               @state == :wants_anything
               found_hash_key(current)
             else
@@ -136,17 +136,17 @@ module JsonMachine
               found_number(scanner.scan_until(NUMBER_MATCHER))
             end
           when 'n'
-            if scanner.peek(4) === NULL
+            if scanner.peek(4) == NULL
               found_nil
               scanner.pos = scanner.pos+4
             end
           when 't'
-            if scanner.peek(4) === TRUE
+            if scanner.peek(4) == TRUE
               found_boolean(true)
               scanner.pos = scanner.pos+4
             end
           when 'f'
-            if scanner.peek(5) === FALSE
+            if scanner.peek(5) == FALSE
               found_boolean(false)
               scanner.pos = scanner.pos+5
             end
