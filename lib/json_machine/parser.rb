@@ -70,9 +70,6 @@ module JsonMachine
     end
     
     def found_array_start
-      if @state != :wants_array_value || !@builder_stack.last.is_a?(Array)
-        @builder_stack.pop
-      end
       @nested_array_level += 1
       set_value([])
     end
@@ -109,6 +106,7 @@ module JsonMachine
       end
     end
     alias :<< :parse
+    
     protected
       def internal_parse(str)
         scanner = StringScanner.new(str)
@@ -118,19 +116,27 @@ module JsonMachine
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(/\"|\\\".+\"/m)
-            current = current.gsub(/\\[\\bfnrt]/) do |match|
+            current.gsub!(/\\[\\bfnrt]/) do |match|
               if u = UNESCAPE_MAP[$&[1]]
                 u
               end
             end
+            current.gsub!(/\\([\\\/]|u[[:xdigit:]]{4})/) do
+              ustr = $1
+              if ustr[0,1] == 'u'
+                [ustr[1..-1].to_i(16)].pack("U")
+              elsif ustr == '\\'
+                '\\\\'
+              else
+                ustr
+              end
+            end
             current = current[0,current.size-1]
             if @state == :wants_hash_key
-              @state == :wants_anything
               found_hash_key(current)
             else
               found_string(current)
             end
-            scanner.pos += 1 unless scanner.eos? # skip the trailing " char
           when /[0-9]/
             if scanner.check_until(NUMBER_MATCHER)
               found_number(scanner.scan_until(NUMBER_MATCHER))
@@ -153,21 +159,15 @@ module JsonMachine
           when '{'
             found_hash_start
             scanner.pos = scanner.pos+1
-            @state = :wants_hash_key
-            next
           when '}'
             found_hash_end
             scanner.pos = scanner.pos+1
-            next
           when '['
             found_array_start
             scanner.pos = scanner.pos+1
-            @state = :wants_array_value
-            next
           when ']'
             found_array_end
             scanner.pos = scanner.pos+1
-            next
           else
             if @state == :wants_hash_key && char == ':'
               raise ParseError, "Expected the start of a Hash key but got #{char} instead"
@@ -175,7 +175,6 @@ module JsonMachine
             # try to skip multiple chars instead of just one char at a time
             # but fall back to skipping one at a time
             scanner.skip(/[ \*\t\r\n,]+/) || scanner.pos += 1
-            next
           end
         end
         unless @callback.nil?
@@ -210,6 +209,15 @@ module JsonMachine
           end
         else
           @builder_stack << value
+        end
+        
+        case @builder_stack.last.class.name
+        when 'Hash'
+          @state = :wants_hash_key
+        when 'Array'
+          @state = :wants_array_value
+        else
+          @state = :wants_anything
         end
       end
       
