@@ -1,4 +1,5 @@
 # encoding: UTF-8
+require 'strscan'
 
 module JsonMachine
   class ParseError < StandardError; end
