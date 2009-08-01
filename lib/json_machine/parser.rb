@@ -117,11 +117,7 @@ module JsonMachine
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(/\"|\\\".+\"/m)
-            current.gsub!(/\\[\\bfnrt]/) do |match|
-              if u = UNESCAPE_MAP[$&[1]]
-                u
-              end
-            end
+            current.gsub!(/\\[\\bfnrt]/) { |match| u if u = UNESCAPE_MAP[$&[1]] }
             current.gsub!(/\\([\\\/]|u[[:xdigit:]]{4})/) do
               ustr = $1
               if ustr[0,1] == 'u'
