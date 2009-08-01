@@ -4,6 +4,8 @@ require 'rubygems'
 require 'benchmark'
 require 'yajl'
 require 'json/pure'
+# if we require activesupport, it'll unconditionally require the C version of the JSON gem
+# this benchmark wants to use the pure ruby version
 # require 'activesupport'
 require File.join(File.dirname(__FILE__), '..', 'lib', 'json_machine')
 
@@ -12,18 +14,17 @@ yajl = json_machine = active_support = json_pure = ""
 Benchmark.bm do |x|
   puts "yajl-ruby"
   x.report do
-    yajl = Yajl::Parser.parse(json)
+    Yajl::Parser.parse(json)
   end
   
   puts "JsonMachine"
   x.report do
-    parser = JsonMachine::Parser.new(:symbolize_keys => true)
-    puts (json_machine = parser.parse(json)).inspect
+    JsonMachine::Parser.new.parse(json)
   end
   
   puts "JSON (pure)"
   x.report do
-    json_pure = JSON.parse(json)
+    JSON.parse(json, :max_nesting => false)
   end
   
   # puts "ActiveSupport"
