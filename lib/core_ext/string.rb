@@ -30,11 +30,11 @@ class String
   # And returns a new unescaped UTF-8 string like:
   #   MÐ°äºŒí €í¼‚
   def unescape_utf8
-    utf8Buf = nil
+    utf8Buf = ""
+    utf8Buf.force_encoding("binary") if utf8Buf.respond_to?(:force_encoding)
     scanner = StringScanner.new(self)
     while !scanner.eos?
       if scanner.getch == "\\" && scanner.getch == "u"
-        utf8Buf ||= ""
         codepoint = scanner.peek(4).hex
         scanner.pos += 4
         
@@ -69,6 +69,6 @@ class String
         
       end
     end
-    utf8Buf.nil? ? self : utf8Buf
+    utf8Buf == "" ? self : utf8Buf
   end
 end
