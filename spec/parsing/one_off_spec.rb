@@ -15,7 +15,6 @@ describe "One-off JSON examples" do
   end
   
   it "should not parse JSON with a comment, with :allow_comments set to false" do
-    pending
     json = StringIO.new('{"key": /* this is a comment */ "value"}')
     lambda {
       @parser.parse(json, :allow_comments => false)
@@ -23,11 +22,10 @@ describe "One-off JSON examples" do
   end
   
   it "should parse JSON with a comment, with :allow_comments set to true" do
-    pending
     json = StringIO.new('{"key": /* this is a comment */ "value"}')
     lambda {
-      @parser.parse(json, :allow_comments => true)
-    }.should_not raise_error(Yajl::ParseError)
+      @parser.parse(json, :allow_comments => true).should == {"key" => "value"}
+    }.should_not raise_error(JsonMachine::ParseError)
   end
   
   it "should not parse invalid UTF8 with :check_utf8 set to true" do

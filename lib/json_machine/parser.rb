@@ -158,9 +158,16 @@ module JsonMachine
           when ']'
             found_array_end
             scanner.pos = scanner.pos+1
+          when '*' # is this a comment?
+            if @options[:allow_comments]
+              scanner.pos += 1
+              scanner.skip_until(/\*/)
+            else
+              raise ParseError, "Found a comment in the JSON source, but allow_comments wasn't turned on."
+            end
           else
             if @state == :wants_hash_key && char == ':'
-              raise ParseError, "Expected the start of a Hash key but got #{char} instead"
+              raise ParseError, "Expected the start of a Hash key but got #{char} instead."
             end
             # try to skip multiple chars instead of just one char at a time
             # but fall back to skipping one at a time
