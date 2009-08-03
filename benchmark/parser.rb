@@ -3,7 +3,7 @@
 require 'rubygems'
 require 'benchmark'
 require 'yajl'
-require 'json/pure'
+# require 'json/pure'
 # if we require activesupport, it'll unconditionally require the C version of the JSON gem
 # this benchmark wants to use the pure ruby version
 # require 'activesupport'
