@@ -14,18 +14,18 @@ yajl = json_machine = active_support = json_pure = ""
 Benchmark.bm do |x|
   puts "yajl-ruby"
   x.report do
-    Yajl::Parser.parse(json)
+    yajl = Yajl::Parser.parse(json)
   end
   
   puts "JsonMachine"
   x.report do
-    JsonMachine::Parser.new.parse(json)
+    json_machine = JsonMachine::Parser.new.parse(json)
   end
   
-  puts "JSON (pure)"
-  x.report do
-    JSON.parse(json, :max_nesting => false)
-  end
+  # puts "JSON (pure)"
+  # x.report do
+  #   JSON.parse(json, :max_nesting => false)
+  # end
   
   # puts "ActiveSupport"
   # x.report do

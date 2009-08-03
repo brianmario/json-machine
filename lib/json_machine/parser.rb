@@ -1,4 +1,5 @@
 # encoding: UTF-8
+
 require 'strscan'
 
 module JsonMachine
@@ -117,18 +118,9 @@ module JsonMachine
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(/\"|\\\".+\"/m)
-            current.gsub!(/\\[\\bfnrt]/) { |match| u if u = UNESCAPE_MAP[$&[1]] }
-            current.gsub!(/\\([\\\/]|u[[:xdigit:]]{4})/) do
-              ustr = $1
-              if ustr[0,1] == 'u'
-                [ustr[1..-1].to_i(16)].pack("U")
-              elsif ustr == '\\'
-                '\\\\'
-              else
-                ustr
-              end
-            end
-            current = current[0,current.size-1]
+            current.gsub!(/\\[\\bfnrt]/) { |match| match if match = UNESCAPE_MAP[$&[1]] }
+            current = current.unescape_utf8
+            current = current[0,current.size-1] if current[current.size-1,1] == "\""
             if @state == :wants_hash_key
               found_hash_key(current)
             else
