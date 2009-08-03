@@ -119,7 +119,7 @@ module JsonMachine
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(/\"|\\\".+\"/m)
             current.gsub!(/\\[\\bfnrt]/) { |match| match if match = UNESCAPE_MAP[$&[1]] }
-            current = current.unescape_utf8
+            current.unescape_utf8!
             current = current[0,current.size-1] if current[current.size-1,1] == "\""
             if @state == :wants_hash_key
               found_hash_key(current)
