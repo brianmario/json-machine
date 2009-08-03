@@ -62,7 +62,6 @@ describe "Chunked parser" do
   end
   
   it "should parse a JSON string an IO and fire callback once" do
-    pending
     @callback.should_receive(:call).with(@final)
     @parser.parse(StringIO.new('[{"abc": 123},{"def": 456}]'))
   end

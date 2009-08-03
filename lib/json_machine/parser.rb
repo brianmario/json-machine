@@ -101,6 +101,7 @@ module JsonMachine
       if str_or_io.is_a?(String)
         internal_parse(str_or_io)
       elsif str_or_io.respond_to?(:read)
+        internal_parse(str_or_io.read)
         # TODO: not supported yet
         # while str = str_or_io.read(READ_BUFFER_SIZE)
         #   internal_parse(str)

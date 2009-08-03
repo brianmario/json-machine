@@ -19,7 +19,7 @@ describe "One-off JSON examples" do
     json = StringIO.new('{"key": /* this is a comment */ "value"}')
     lambda {
       @parser.parse(json, :allow_comments => false)
-    }.should raise_error(Yajl::ParseError)
+    }.should raise_error(JsonMachine::ParseError)
   end
   
   it "should parse JSON with a comment, with :allow_comments set to true" do
@@ -39,7 +39,6 @@ describe "One-off JSON examples" do
   end
   
   it "should parse using it's class method, from an IO" do
-    pending
     io = StringIO.new('{"key": 1234}')
     @parser.parse(io).should == {"key" => 1234}
   end

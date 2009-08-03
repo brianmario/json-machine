@@ -40,7 +40,6 @@ describe "ActiveSupport test cases" do
   
   TESTS.each do |json, expected|
     it "should be able to parse #{json} as an IO" do
-      pending
       lambda {
         @parser.parse(StringIO.new(json)).should == expected
       }.should_not raise_error(JsonMachine::ParseError)
@@ -56,7 +55,6 @@ describe "ActiveSupport test cases" do
   end
 
   it "should fail parsing {: 1} as an IO" do
-    pending
     lambda {
       @parser.parse(StringIO.new("{: 1}"))
     }.should raise_error(JsonMachine::ParseError)
