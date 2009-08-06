@@ -24,6 +24,7 @@
 #
 
 class String
+  UTF8_ESCAPED = /\\u([a-f0-9]{4})/i
   # This method takes an escaped string such as:
   #   "\u004d\u0430\u4e8c\ud800\udf02"
   #
@@ -35,7 +36,7 @@ class String
     
     found_surrogate = false
     prev_codepoint = nil
-    self.gsub!(/\\u([a-f0-9]{4})/i) do |char|
+    self.gsub!(UTF8_ESCAPED) do |char|
       if found_surrogate
         surrogate = $1.hex
         codepoint = (((prev_codepoint & 0x3F) << 10) |

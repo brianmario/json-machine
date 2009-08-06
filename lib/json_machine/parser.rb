@@ -10,10 +10,6 @@ module JsonMachine
       new(opts).parse(str_or_io, &block)
     end
     
-    NULL = "null".freeze
-    TRUE = "true".freeze
-    FALSE = "false".freeze
-    NUMBER_MATCHER = /[-+]?\d*\.?\d+([eE][-+]?\d+)?/.freeze
     UNESCAPE_MAP = Hash.new { |h, k| h[k] = k.chr }
     UNESCAPE_MAP.update({
       ?"  => '"',
@@ -26,6 +22,26 @@ module JsonMachine
       ?t  => "\t",
       ?u  => nil, 
     })
+    
+    # These are here to prevent constantly being GC'd when used inline
+    NULL =              "null"
+    TRUE =              "true"
+    FALSE =             "false"
+    NUMBER_MATCHER =    /[-+]?\d*\.?\d+([eE][-+]?\d+)?/
+    SKIP_CHARS =        /[ \*\t\r\n,]+/
+    SKIP_COMMENTS =     /\*/
+    NEXT_QUOTE =        /\"|\\\".+\"/m
+    ESCAPED =           /\\[\\bfnrt]/
+    QUOTE_CHAR =        '"'
+    ANY_NUMBER =        /[0-9]/
+    START_OF_NULL =     'n'
+    START_OF_TRUE =     't'
+    START_OF_FALSE =    'f'
+    START_OF_HASH =     '{'
+    END_OF_HASH =       '}'
+    START_OF_ARRAY =    '['
+    END_OF_ARRAY =      ']'
+    START_OF_COMMENT =  '*'
     
     def initialize(opts={})
       # TODO: setup options
@@ -115,11 +131,11 @@ module JsonMachine
         scanner = StringScanner.new(str)
         while !scanner.eos? && (char = scanner.peek(1))
           case char
-          when '"'
+          when QUOTE_CHAR
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
-            current = scanner.scan_until(/\"|\\\".+\"/m)
-            current.gsub!(/\\[\\bfnrt]/) { |match| match if match = UNESCAPE_MAP[$&[1]] }
+            current = scanner.scan_until(NEXT_QUOTE)
+            current.gsub!(ESCAPED) { |match| match if match = UNESCAPE_MAP[$&[1]] }
             current.unescape_utf8!
             current = current[0,current.size-1] if current[current.size-1,1] == "\""
             if @state == :wants_hash_key
@@ -127,41 +143,41 @@ module JsonMachine
             else
               found_string(current)
             end
-          when /[0-9]/
+          when ANY_NUMBER
             if scanner.check_until(NUMBER_MATCHER)
               found_number(scanner.scan_until(NUMBER_MATCHER))
             end
-          when 'n'
+          when START_OF_NULL
             if scanner.peek(4) == NULL
               found_nil
               scanner.pos = scanner.pos+4
             end
-          when 't'
+          when START_OF_TRUE
             if scanner.peek(4) == TRUE
               found_boolean(true)
               scanner.pos = scanner.pos+4
             end
-          when 'f'
+          when START_OF_FALSE
             if scanner.peek(5) == FALSE
               found_boolean(false)
               scanner.pos = scanner.pos+5
             end
-          when '{'
+          when START_OF_HASH
             found_hash_start
             scanner.pos = scanner.pos+1
-          when '}'
+          when END_OF_HASH
             found_hash_end
             scanner.pos = scanner.pos+1
-          when '['
+          when START_OF_ARRAY
             found_array_start
             scanner.pos = scanner.pos+1
-          when ']'
+          when END_OF_ARRAY
             found_array_end
             scanner.pos = scanner.pos+1
-          when '*' # is this a comment?
+          when START_OF_COMMENT # is this a comment?
             if @options[:allow_comments]
               scanner.pos += 1
-              scanner.skip_until(/\*/)
+              scanner.skip_until(SKIP_COMMENTS)
             else
               raise ParseError, "Found a comment in the JSON source, but allow_comments wasn't turned on."
             end
@@ -171,9 +187,10 @@ module JsonMachine
             end
             # try to skip multiple chars instead of just one char at a time
             # but fall back to skipping one at a time
-            scanner.skip(/[ \*\t\r\n,]+/) || scanner.pos += 1
+            scanner.skip(SKIP_CHARS) || scanner.pos += 1
           end
         end
+        
         unless @callback.nil?
           check_and_fire_callback
         else
@@ -184,20 +201,18 @@ module JsonMachine
       def set_value(value)
         len = @builder_stack.size
         if len > 0
-          last_entry = @builder_stack.last
-          case last_entry.class.name
-          when 'Array'
-            last_entry << value
+          if @builder_stack.last.is_a?(Array)
+            @builder_stack.last << value
             if value.is_a?(Hash) or value.is_a?(Array)
               @builder_stack << value
             end
-          when 'Hash'
-            last_entry[value] = nil
+          elsif @builder_stack.last.is_a?(Hash)
+            @builder_stack.last[value] = nil
             @builder_stack << value
-          when 'String', 'Symbol'
+          elsif @builder_stack.last.is_a?(String) or @builder_stack.last.is_a?(Symbol)
             hash = @builder_stack[len-2]
             if hash.is_a?(Hash)
-              hash[last_entry] = value
+              hash[@builder_stack.last] = value
               @builder_stack.pop
               if value.is_a?(Hash) or value.is_a?(Array)
                 @builder_stack << value
@@ -208,10 +223,9 @@ module JsonMachine
           @builder_stack << value
         end
         
-        case @builder_stack.last.class.name
-        when 'Hash'
+        if @builder_stack.last.is_a?(Hash)
           @state = :wants_hash_key
-        when 'Array'
+        elsif @builder_stack.last.is_a?(Array)
           @state = :wants_array_value
         else
           @state = :wants_anything
