@@ -56,4 +56,8 @@ describe "One-off JSON examples" do
     end
     output.should == {"key" => 1234}
   end
+  
+  it "should parse an escaped URL string" do
+    @parser.parse('"http:\/\/express.engineyard.com\/"').should == "http://express.engineyard.com/"
+  end
 end

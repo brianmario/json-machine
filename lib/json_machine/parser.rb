@@ -31,7 +31,7 @@ module JsonMachine
     SKIP_CHARS =        /[ \*\t\r\n,]+/
     SKIP_COMMENTS =     /\*/
     NEXT_QUOTE =        /\"|\\\".+\"/m
-    ESCAPED =           /\\[\\bfnrt]/
+    ESCAPED =           /\\[\/\\bfnrt]/
     QUOTE_CHAR =        '"'
     ANY_NUMBER =        /[0-9]/
     START_OF_NULL =     'n'
