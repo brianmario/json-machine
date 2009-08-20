@@ -5,7 +5,23 @@ module JsonMachine
     def initialize(opts={})
     end
     
-    def encode(obj, str_or_io=nil)
+    def encode(obj)
+      case obj.class.name
+      when "Hash"
+        val = "{"
+        val << obj.keys.map do |key|
+          "\"#{key}\": #{encode(obj[key])}"
+        end * ", "
+        val << "}"
+      when "Array"
+        "[#{obj.map{|val| encode(val)} * ', '}]"
+      when "NilClass"
+        "null"
+      when "TrueClass", "FalseClass", "Fixnum", "Float"
+        obj.to_s
+      else
+        "\"#{obj.to_s}\""
+      end
     end
   end
 end

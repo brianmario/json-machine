@@ -1,0 +1,14 @@
+= WARNING: THIS CODE IS EXPERIMENTAL AT THE MOMENT
+
+= JSON Machine
+
+A modern, pure-ruby streaming JSON parser/encoder modeled after yajl-ruby.
+
+My intention is to create a pure-ruby, SAX-like, streaming JSON parser that allows the caller to build their own objects while parsing is happening.
+For example, by overriding the "found_string(str)" method, the caller can scan and parse out other types of objects (like say, Time or Date).
+
+I have the parser working, and according to my testing it's able to generate matching output to the JSON gem, ActiveSupport and yajl-ruby but with one important difference.
+It has better UTF-8 support (specifically regarding surrogate character sequences) and [will eventually be] able to parse and encode to/from a stream in chunks.
+
+Now that I have the parser working, my next step is to go back over the implementation and optimize the shit out of it.
+Help/suggestions would be greatly appreciated :)
