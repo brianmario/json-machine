@@ -20,7 +20,11 @@ module JsonMachine
       when "TrueClass", "FalseClass", "Fixnum", "Float"
         obj.to_s
       else
-        "\"#{obj.to_s}\""
+        if obj.respond_to?(:to_json)
+          obj.to_json
+        else
+          "\"#{obj.to_s}\""
+        end
       end
     end
   end
