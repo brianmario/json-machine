@@ -30,8 +30,8 @@ module JsonMachine
     NUMBER_MATCHER =    /[-+]?\d*\.?\d+([eE][-+]?\d+)?/
     SKIP_CHARS =        /[ \*\t\r\n,]+/
     SKIP_COMMENTS =     /\*/
-    NEXT_QUOTE =        /\"|\\\".+\"/m
-    ESCAPED =           /\\[\/\\bfnrt]/
+    NEXT_QUOTE  =        /([^\"\\]|\\.)*\"/m
+    ESCAPED =           /\\[\/\\bfnrt\"]|#{String::UTF8_ESCAPED}/
     QUOTE_CHAR =        '"'
     ANY_NUMBER =        /[0-9]/
     START_OF_NULL =     'n'
@@ -135,9 +135,15 @@ module JsonMachine
             # grabs the contents of a string between " and ", even escaped strings
             scanner.pos += 1 # don't need the wrapping " char
             current = scanner.scan_until(NEXT_QUOTE)
-            current.gsub!(ESCAPED) { |match| match if match = UNESCAPE_MAP[$&[1]] }
-            current.unescape_utf8!
-            current = current[0,current.size-1] if current[current.size-1,1] == "\""
+            current.gsub!(ESCAPED) do |match|
+              case match
+              when String::UTF8_ESCAPED
+                match.unescape_utf8
+              else
+                UNESCAPE_MAP[match[1]]
+              end
+            end
+            current = current[0,current.size-1]
             if @state == :wants_hash_key
               found_hash_key(current)
             else
