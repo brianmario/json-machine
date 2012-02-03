@@ -41,16 +41,24 @@ describe "ActiveSupport test cases" do
   TESTS.each do |json, expected|
     it "should be able to parse #{json} as an IO" do
       lambda {
-        @parser.parse(StringIO.new(json)).should == expected
+        @parser.parse(StringIO.new(json))
       }.should_not raise_error(JsonMachine::ParseError)
+    end
+
+    it "should parse #{json} correctly as an IO" do
+      @parser.parse(StringIO.new(json)).should == expected
     end
   end
   
   TESTS.each do |json, expected|
     it "should be able to parse #{json} as a string" do
       lambda {
-        @parser.parse(json).should === expected
+        @parser.parse(json)
       }.should_not raise_error(JsonMachine::ParseError)
+    end
+
+    it "should parse #{json} correctly" do
+      @parser.parse(json).should == expected
     end
   end
 
