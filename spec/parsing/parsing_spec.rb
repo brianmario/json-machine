@@ -12,7 +12,7 @@ describe "JsonMachine::Parser" do
   
   it "should parse a string with an escaped string inside" do
     parse_str = "\"this is a string with \\\"and escaped string inside\\\"    and some padding    \""
-    compare = "this is a string with \\\"and escaped string inside\\\"    and some padding    "
+    compare = "this is a string with \"and escaped string inside\"    and some padding    "
     out = @parser.parse(parse_str)
     out.should === compare
   end
